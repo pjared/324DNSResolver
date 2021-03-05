@@ -166,15 +166,17 @@ dns_answer_entry *get_answer_address(char *qname, dns_rr_type qtype, unsigned ch
 
 struct answer{
 	unsigned short num_answers;
-}
+};
 
 void parse_response(char* response, int length) {
 	//we need to get the number of answers
 	//we need to get where the names start
-	//
 	struct answer *answer_struct = malloc(sizeof(struct answer));
+	answer_struct->num_answers = atoi(response + 5);
 	//strncpy(dest, src + beginIndex, endIndex - beginIndex);
-	answer_struct->num_answers = 
+	//unsigned short num_a;
+	//memcpy(answer_struct->num_answers,response + 4, 2);
+	print_bytes((unsigned char*) answer_struct, 10);
 }
 
 int name_ascii_to_wire(char *name, char* newName) {
