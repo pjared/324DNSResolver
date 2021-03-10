@@ -6,8 +6,8 @@
 #include<sys/types.h>
 #include<sys/socket.h>
 #include<time.h>
-#include <netdb.h>
-#include <unistd.h>
+#include<netdb.h>
+#include<unistd.h>
 
 typedef unsigned int dns_rr_ttl;
 typedef unsigned short dns_rr_type;
@@ -164,19 +164,36 @@ dns_answer_entry *get_answer_address(char *qname, dns_rr_type qtype, unsigned ch
 	 */
 }
 
-struct answer{
-	unsigned short num_answers;
-};
-
-void parse_response(char* response, int length) {
+dns_answer_entry *parse_response(char* response, int length) {
 	//we need to get the number of answers
 	//we need to get where the names start
-	struct answer *answer_struct = malloc(sizeof(struct answer));
-	answer_struct->num_answers = atoi(response + 5);
-	//strncpy(dest, src + beginIndex, endIndex - beginIndex);
-	//unsigned short num_a;
-	//memcpy(answer_struct->num_answers,response + 4, 2);
-	print_bytes((unsigned char*) answer_struct, 10);
+	int curPos = length;
+	char type = response[curPos - 3];
+	char class = response[curPos - 1];
+	curPos += 10;
+	char data_length = response[curPos + 1];
+	curPos += 2;
+	char cur_char = response[curPos];
+	
+	while(cur_char != 0x00) {
+		curPos += 1;
+		cur_char = response[curPos];
+		if(cur_char == 0xc0) {
+
+		}
+	}
+	//printf("Length: %d, Total Length: %d\n", length - 4, curPos);
+	char* answers = malloc(124);
+	memcpy(answers, response + (length + 12), curPos);
+	char* netString = malloc(124);
+	print_bytes(answers, sizeof(answers));
+	//inet_ntop(AF_INET, answers, netString,sizeof(answers));
+	struct dns_answer_entry *answer = malloc(sizeof(struct dns_answer_entry)); 
+	answer->value = netString;
+	answer->next = NULL;
+	print_bytes(answer, sizeof(struct dns_answer_entry));
+	//TODO: Need to properly convert the data, then store it in answer and good to go.
+	return answer;
 }
 
 int name_ascii_to_wire(char *name, char* newName) {
@@ -216,6 +233,7 @@ unsigned short create_dns_query(char *qname, unsigned char *wire) {
 	header->auth_records = htons(0x0000);
 	header->records = htons(0x0000);
 	memcpy(wire, (unsigned char*) header, sizeof(struct dns_query_header));
+	free(header);
 	copyLoc += sizeof(struct dns_query_header);
 	char* question = malloc(512); //TODO:clear up the size of this malloc	
 	int name_len = name_ascii_to_wire(qname, question); //question should be set
@@ -241,7 +259,6 @@ int send_recv_message(unsigned char *request, int requestlen, unsigned char *res
 	hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
 	hints.ai_flags = 0;
 	hints.ai_protocol = 0;          /* Any protocol */
-
 	int sfd, s, j;
 	s = getaddrinfo(server, port, &hints, &result);
 	if (s != 0) {
@@ -253,20 +270,15 @@ int send_recv_message(unsigned char *request, int requestlen, unsigned char *res
 				rp->ai_protocol);
 		if (sfd == -1)
 			continue;
-
 		if (connect(sfd, rp->ai_addr, rp->ai_addrlen) != -1)
 			break;                  /* Success */
-
 		close(sfd);
 	}
-
 	if (rp == NULL) {               /* No address succeeded */
 		fprintf(stderr, "Could not connect\n");
 		exit(EXIT_FAILURE);
 	}
-
 	freeaddrinfo(result);           /* No longer needed */
-
 	send(sfd, request, requestlen, 0);
 	return recv(sfd, response, 512, 0);
 }
@@ -277,8 +289,8 @@ dns_answer_entry *resolve(char *qname, char *server, char *port) {
   unsigned short len = create_dns_query(qname, wire);
   char* response = malloc(512); 
   int response_length = send_recv_message(wire, len, response, server, port);
-  parse_response(response, response_length);
   print_bytes(response, response_length);
+  struct dns_answer_entry *start = parse_response(response, len);
   free(response);
   free(wire);
 }
