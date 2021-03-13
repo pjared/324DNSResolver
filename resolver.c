@@ -36,6 +36,7 @@ typedef struct dns_answer_entry dns_answer_entry;
 void free_answer_entries(dns_answer_entry *ans) {
 	dns_answer_entry *next;
 	while (ans != NULL) {
+		//printf("tried to free\n");
 		next = ans->next;
 		free(ans->value);
 		free(ans);
@@ -115,7 +116,7 @@ void canonicalize_name(char *name) {
 	}
 }
 
-char *name_ascii_from_wire(unsigned char *wire, int *indexp) {
+char *name_ascii_from_wire(unsigned char *str, int *indexp) {
 	/* 
 	 * Extract the wire-formatted DNS name at the offset specified by
 	 * *indexp in the array of bytes provided (wire) and return its string
@@ -129,6 +130,8 @@ char *name_ascii_from_wire(unsigned char *wire, int *indexp) {
 	 * OUTPUT: a string containing the string representation of the name,
 	 *              allocated on the heap.
 	 */
+	sprintf(str, "%i.%i.%i.%i", str[0], str[1], str[2], str[3]);
+	return str;
 }
 
 dns_rr rr_from_wire(unsigned char *wire, int *indexp, int query_only) {
@@ -165,7 +168,6 @@ dns_answer_entry *get_answer_address(char *qname, dns_rr_type qtype, unsigned ch
 }
 
 dns_answer_entry *parse_response(char* response, int length) {
-	//we need to get the number of answers
 	//we need to get where the names start
 	int curPos = length;
 	char type = response[curPos - 3];
@@ -185,13 +187,14 @@ dns_answer_entry *parse_response(char* response, int length) {
 	//printf("Length: %d, Total Length: %d\n", length - 4, curPos);
 	char* answers = malloc(124);
 	memcpy(answers, response + (length + 12), curPos);
-	char* netString = malloc(124);
-	print_bytes(answers, sizeof(answers));
-	//inet_ntop(AF_INET, answers, netString,sizeof(answers));
+	
+	//print_bytes(netString, sizeof(netString));
 	struct dns_answer_entry *answer = malloc(sizeof(struct dns_answer_entry)); 
-	answer->value = netString;
+	answer->value = name_ascii_from_wire(answers, 0);
+	//print_bytes(answer->value, 8);
 	answer->next = NULL;
-	print_bytes(answer, sizeof(struct dns_answer_entry));
+	//free(answers);
+	//print_bytes(answer, sizeof(struct dns_answer_entry));
 	//TODO: Need to properly convert the data, then store it in answer and good to go.
 	return answer;
 }
@@ -220,7 +223,6 @@ struct dns_query_header {
   unsigned short auth_records;
   unsigned short records;
 };
-
 
 unsigned short create_dns_query(char *qname, unsigned char *wire) {
 	int copyLoc = 0;
@@ -289,10 +291,11 @@ dns_answer_entry *resolve(char *qname, char *server, char *port) {
   unsigned short len = create_dns_query(qname, wire);
   char* response = malloc(512); 
   int response_length = send_recv_message(wire, len, response, server, port);
-  print_bytes(response, response_length);
+  //print_bytes(response, response_length); -IMPORTANT
   struct dns_answer_entry *start = parse_response(response, len);
   free(response);
   free(wire);
+  return start;
 }
 
 int main(int argc, char *argv[]) {
